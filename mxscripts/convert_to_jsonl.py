@@ -104,6 +104,7 @@ def main():
                 user_message = json.load(f)
 
             record = {
+                "query_id": qdir.name,
                 "user_message": user_message,
                 "allowed_connections": allowed_connections,
             }

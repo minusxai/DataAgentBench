@@ -21,12 +21,33 @@ from pathlib import Path
 
 
 def extract_answer(log: list) -> str | None:
-    """Extract the final answer from the last assistant message in the log."""
+    """Extract the final answer from the log.
+
+    Supports two log formats:
+    - New format: entries with _type="task_result" and result.content_blocks
+    - Legacy format: entries with role="assistant" and content list/string
+    """
+    # New format: look for last task_result with content_blocks
+    for entry in reversed(log):
+        if entry.get("_type") == "task_result" and "result" in entry:
+            result = entry["result"]
+            if isinstance(result, str):
+                result = json.loads(result)
+            if "content_blocks" in result:
+                text_parts = [
+                    b.get("text", "")
+                    for b in result["content_blocks"]
+                    if b.get("type") == "text"
+                ]
+                text = "\n".join(text_parts).strip()
+                if text:
+                    return text
+
+    # Legacy format: last assistant message
     for entry in reversed(log):
         if entry.get("role") != "assistant":
             continue
         content = entry.get("content", "")
-        # content can be a string or a list of parts
         if isinstance(content, list):
             text_parts = [p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"]
             text = "\n".join(text_parts)
@@ -66,22 +87,21 @@ def main():
     with open(output_path) as f:
         lines = [json.loads(line) for line in f if line.strip()]
 
-    # Match lines to query dirs (query1, query2, ...)
-    query_dirs = sorted(
-        [d for d in bench_dir.iterdir() if d.is_dir() and d.name.startswith("query") and d.name != "query_dataset"],
-        key=lambda d: int("".join(filter(str.isdigit, d.name)) or "0"),
-    )
-
-    if len(lines) != len(query_dirs):
-        print(f"Warning: {len(lines)} output lines but {len(query_dirs)} queries", file=sys.stderr)
-
     passed = 0
     failed = 0
     errors = 0
     processed_lines = []
 
-    for i, (line, qdir) in enumerate(zip(lines, query_dirs)):
-        query_name = qdir.name
+    for line in lines:
+        query_id = line.get("input", {}).get("query_id")
+        if not query_id:
+            print(f"  [???] SKIP - no query_id in output line", file=sys.stderr)
+            line["eval"] = {"pass": False, "reason": "no query_id in output"}
+            processed_lines.append(line)
+            continue
+
+        query_name = query_id
+        qdir = bench_dir / query_id
         validate_py = qdir / "validate.py"
 
         if not validate_py.exists():
