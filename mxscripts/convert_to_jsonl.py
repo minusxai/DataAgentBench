@@ -21,10 +21,20 @@ DB_TYPE_TO_DIALECT = {
     "duckdb": "duckdb",
     "postgresql": "postgresql",
     "postgres": "postgresql",
+    "mongo": "mongo",
+    "mongodb": "mongo",
     "bigquery": "bigquery",
     "athena": "athena",
     "csv": "csv",
 }
+
+# Defaults match mxscripts/docker-compose.yml.
+PG_HOST = "localhost"
+PG_PORT = 5432
+PG_USER = "postgres"
+PG_PASSWORD = "postgres"
+MONGO_HOST = "localhost"
+MONGO_PORT = 27017
 
 
 def build_connections(db_clients: dict, bench_dir: Path) -> list[dict]:
@@ -32,40 +42,46 @@ def build_connections(db_clients: dict, bench_dir: Path) -> list[dict]:
     for name, info in db_clients.items():
         db_type = info.get("db_type", "")
         dialect = DB_TYPE_TO_DIALECT.get(db_type, db_type)
-        db_path = info.get("db_path", "")
 
-        # Resolve to absolute path relative to bench_dir
-        abs_path = str((bench_dir / db_path).resolve())
+        if db_type in ("postgres", "postgresql"):
+            config = {
+                "host": PG_HOST,
+                "port": PG_PORT,
+                "database": info.get("db_name", ""),
+                "user": PG_USER,
+                "password": PG_PASSWORD,
+            }
+        elif db_type in ("mongo", "mongodb"):
+            config = {
+                "host": MONGO_HOST,
+                "port": MONGO_PORT,
+                "database": info.get("db_name", ""),
+            }
+        else:
+            db_path = info.get("db_path", "")
+            config = {
+                "file_path": str((bench_dir / db_path).resolve()),
+            }
 
-        conn = {
+        connections.append({
             "name": name,
             "dialect": dialect,
-            "config": {
-                "file_path": abs_path,
-            },
-        }
-        connections.append(conn)
+            "config": config,
+        })
     return connections
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Convert a sub-benchmark to eval-agent format")
-    parser.add_argument("benchmark", help="Sub-benchmark name, e.g. stockindex")
-    args = parser.parse_args()
-
-    repo_root = Path(__file__).resolve().parent.parent
-    bench_dir = repo_root / f"query_{args.benchmark}"
-    out_dir = repo_root / "mxdatasets"
+def convert_one(benchmark: str, repo_root: Path, out_dir: Path) -> bool:
+    bench_dir = repo_root / f"query_{benchmark}"
 
     if not bench_dir.is_dir():
         print(f"Error: benchmark directory not found: {bench_dir}", file=sys.stderr)
-        sys.exit(1)
+        return False
 
-    # Parse db_config.yaml
     config_path = bench_dir / "db_config.yaml"
     if not config_path.exists():
         print(f"Error: db_config.yaml not found in {bench_dir}", file=sys.stderr)
-        sys.exit(1)
+        return False
 
     with open(config_path) as f:
         config = yaml.safe_load(f)
@@ -73,15 +89,13 @@ def main():
     db_clients = config.get("db_clients", {})
     allowed_connections = list(db_clients.keys())
 
-    # --- Write connections config ---
     connections = build_connections(db_clients, bench_dir)
-    connections_path = out_dir / f"{args.benchmark}_connections.json"
+    connections_path = out_dir / f"{benchmark}_connections.json"
     with open(connections_path, "w") as f:
         json.dump(connections, f, indent=2)
         f.write("\n")
-    print(f"Wrote {len(connections)} connections to {connections_path}")
+    print(f"[{benchmark}] Wrote {len(connections)} connections to {connections_path}")
 
-    # --- Write input JSONL ---
     query_dirs = sorted(
         [d for d in bench_dir.iterdir() if d.is_dir() and d.name.startswith("query") and d.name != "query_dataset"],
         key=lambda d: int("".join(filter(str.isdigit, d.name)) or "0"),
@@ -89,9 +103,9 @@ def main():
 
     if not query_dirs:
         print(f"Error: no query directories found in {bench_dir}", file=sys.stderr)
-        sys.exit(1)
+        return False
 
-    input_path = out_dir / f"{args.benchmark}_input.jsonl"
+    input_path = out_dir / f"{benchmark}_input.jsonl"
     count = 0
     with open(input_path, "w") as out:
         for qdir in query_dirs:
@@ -111,7 +125,35 @@ def main():
             out.write(json.dumps(record) + "\n")
             count += 1
 
-    print(f"Wrote {count} queries to {input_path}")
+    print(f"[{benchmark}] Wrote {count} queries to {input_path}")
+    return True
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Convert sub-benchmark(s) to eval-agent format")
+    parser.add_argument("benchmarks", nargs="*", help="Sub-benchmark name(s), e.g. stockindex stockmarket")
+    parser.add_argument("--all", action="store_true", help="Convert every query_* directory in the repo")
+    args = parser.parse_args()
+
+    repo_root = Path(__file__).resolve().parent.parent
+    out_dir = repo_root / "mxdatasets"
+
+    if args.all:
+        benchmarks = sorted(
+            d.name[len("query_"):]
+            for d in repo_root.iterdir()
+            if d.is_dir() and d.name.startswith("query_") and (d / "db_config.yaml").exists()
+        )
+    else:
+        benchmarks = args.benchmarks
+
+    if not benchmarks:
+        parser.error("Specify one or more benchmarks, or pass --all")
+
+    failures = [b for b in benchmarks if not convert_one(b, repo_root, out_dir)]
+    if failures:
+        print(f"\nFailed: {', '.join(failures)}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
