@@ -70,20 +70,17 @@ def load_validator(validate_py: Path):
     return mod.validate
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Evaluate agent output against DAB validators")
-    parser.add_argument("benchmark", help="Sub-benchmark name, e.g. stockindex")
-    args = parser.parse_args()
-
-    repo_root = Path(__file__).resolve().parent.parent
-    output_path = repo_root / "mxdatasets" / f"{args.benchmark}_output.jsonl"
-    bench_dir = repo_root / f"query_{args.benchmark}"
+def evaluate_one(benchmark: str, repo_root: Path) -> tuple[int, int, int] | None:
+    """Returns (passed, failed, errors) or None if the benchmark was skipped."""
+    output_path = repo_root / "mxdatasets" / f"{benchmark}_output.jsonl"
+    bench_dir = repo_root / f"query_{benchmark}"
 
     if not output_path.exists():
-        print(f"Error: output file not found: {output_path}", file=sys.stderr)
-        sys.exit(1)
+        print(f"[{benchmark}] SKIP - no output file at {output_path}", file=sys.stderr)
+        return None
 
-    # Load all output lines
+    print(f"\n=== {benchmark} ===")
+
     with open(output_path) as f:
         lines = [json.loads(line) for line in f if line.strip()]
 
@@ -100,19 +97,18 @@ def main():
             processed_lines.append(line)
             continue
 
-        query_name = query_id
         qdir = bench_dir / query_id
         validate_py = qdir / "validate.py"
 
         if not validate_py.exists():
-            print(f"  [{query_name}] SKIP - no validate.py")
+            print(f"  [{query_id}] SKIP - no validate.py")
             line["eval"] = {"pass": False, "reason": "no validate.py"}
             processed_lines.append(line)
             continue
 
         answer = extract_answer(line.get("log", []))
         if answer is None:
-            print(f"  [{query_name}] ERROR - no answer found in log")
+            print(f"  [{query_id}] ERROR - no answer found in log")
             errors += 1
             line["eval"] = {"pass": False, "reason": "no answer in log"}
             processed_lines.append(line)
@@ -122,7 +118,7 @@ def main():
             validator = load_validator(validate_py)
             is_valid, reason = validator(answer)
         except Exception as e:
-            print(f"  [{query_name}] ERROR - validator raised: {e}")
+            print(f"  [{query_id}] ERROR - validator raised: {e}")
             errors += 1
             line["eval"] = {"pass": False, "reason": str(e)}
             processed_lines.append(line)
@@ -134,24 +130,71 @@ def main():
         else:
             failed += 1
 
-        print(f"  [{query_name}] {status} - {reason}")
+        print(f"  [{query_id}] {status} - {reason}")
         line["eval"] = {"pass": is_valid, "reason": reason}
         processed_lines.append(line)
 
-    # Write processed output
-    processed_path = repo_root / "mxdatasets" / f"{args.benchmark}_output_processed.jsonl"
+    processed_path = repo_root / "mxdatasets" / f"{benchmark}_output_processed.jsonl"
     with open(processed_path, "w") as f:
         for pl in processed_lines:
             f.write(json.dumps(pl) + "\n")
-    print(f"\nWrote {len(processed_lines)} lines to {processed_path}")
 
     total = passed + failed + errors
-    print(f"\n{'='*40}")
-    print(f"Results: {passed}/{total} passed ({passed/total*100:.1f}%)" if total else "No queries evaluated")
-    if failed:
-        print(f"  Failed: {failed}")
-    if errors:
-        print(f"  Errors: {errors}")
+    if total:
+        print(f"  -> {passed}/{total} passed ({passed/total*100:.1f}%) | failed={failed} errors={errors}")
+    else:
+        print("  -> no queries evaluated")
+    return (passed, failed, errors)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate agent output against DAB validators")
+    parser.add_argument("benchmarks", nargs="*", help="Sub-benchmark name(s), e.g. stockindex stockmarket")
+    parser.add_argument("--all", action="store_true", help="Evaluate every benchmark with an output file in mxdatasets/")
+    args = parser.parse_args()
+
+    repo_root = Path(__file__).resolve().parent.parent
+    out_dir = repo_root / "mxdatasets"
+
+    if args.all:
+        benchmarks = sorted(
+            p.name[:-len("_output.jsonl")]
+            for p in out_dir.glob("*_output.jsonl")
+            if not p.name.endswith("_output_processed.jsonl")
+        )
+        if not benchmarks:
+            print(f"No *_output.jsonl files found in {out_dir}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        benchmarks = args.benchmarks
+        if not benchmarks:
+            parser.error("Specify one or more benchmarks, or pass --all")
+
+    totals = {"passed": 0, "failed": 0, "errors": 0}
+    per_bench: list[tuple[str, int, int, int]] = []
+
+    for b in benchmarks:
+        result = evaluate_one(b, repo_root)
+        if result is None:
+            continue
+        p, f_, e = result
+        totals["passed"] += p
+        totals["failed"] += f_
+        totals["errors"] += e
+        per_bench.append((b, p, f_, e))
+
+    if len(per_bench) > 1:
+        print(f"\n{'='*60}")
+        print(f"{'benchmark':<24}{'pass':>6}{'fail':>6}{'err':>6}{'total':>7}{'rate':>8}")
+        print("-" * 60)
+        for b, p, f_, e in per_bench:
+            t = p + f_ + e
+            rate = f"{p/t*100:.1f}%" if t else "-"
+            print(f"{b:<24}{p:>6}{f_:>6}{e:>6}{t:>7}{rate:>8}")
+        grand_total = totals["passed"] + totals["failed"] + totals["errors"]
+        rate = f"{totals['passed']/grand_total*100:.1f}%" if grand_total else "-"
+        print("-" * 60)
+        print(f"{'TOTAL':<24}{totals['passed']:>6}{totals['failed']:>6}{totals['errors']:>6}{grand_total:>7}{rate:>8}")
 
 
 if __name__ == "__main__":

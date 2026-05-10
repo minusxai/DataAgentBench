@@ -36,12 +36,14 @@ drops the data volumes so reloads start clean).
 After running the eval agent (which produces `mxdatasets/<benchmark>_output.jsonl`):
 
 ```bash
-uv run mxscripts/eval_output.py <benchmark>
+uv run mxscripts/eval_output.py <benchmark> [<benchmark> ...]
+uv run mxscripts/eval_output.py --all
 ```
 
-Example:
-```bash
-uv run mxscripts/eval_output.py stockindex
-```
+`--all` evaluates every benchmark that has an `_output.jsonl` in `mxdatasets/`
+and prints a per-benchmark summary plus a grand total.
 
-Reads `mxdatasets/<benchmark>_output.jsonl`, runs each query's validator, and writes `mxdatasets/<benchmark>_output_processed.jsonl` (original output + `eval` key with pass/fail and reason).
+For each benchmark it reads `mxdatasets/<benchmark>_output.jsonl`, runs each
+query's `query_<benchmark>/<query_id>/validate.py`, and writes
+`mxdatasets/<benchmark>_output_processed.jsonl` (original output + `eval` key
+with pass/fail and reason).
