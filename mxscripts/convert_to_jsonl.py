@@ -96,6 +96,18 @@ def convert_one(benchmark: str, repo_root: Path, out_dir: Path) -> bool:
         f.write("\n")
     print(f"[{benchmark}] Wrote {len(connections)} connections to {connections_path}")
 
+    # --- Read context and hint ---
+    context = ""
+    context_path = bench_dir / "db_description.txt"
+    if context_path.exists():
+        context = context_path.read_text().strip()
+
+    hint = ""
+    hint_path = bench_dir / "db_description_withhint.txt"
+    if hint_path.exists():
+        hint = hint_path.read_text().strip()
+
+    # --- Write input JSONL ---
     query_dirs = sorted(
         [d for d in bench_dir.iterdir() if d.is_dir() and d.name.startswith("query") and d.name != "query_dataset"],
         key=lambda d: int("".join(filter(str.isdigit, d.name)) or "0"),
@@ -121,6 +133,8 @@ def convert_one(benchmark: str, repo_root: Path, out_dir: Path) -> bool:
                 "query_id": qdir.name,
                 "user_message": user_message,
                 "allowed_connections": allowed_connections,
+                "context": context,
+                "hint": hint,
             }
             out.write(json.dumps(record) + "\n")
             count += 1
