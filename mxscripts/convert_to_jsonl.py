@@ -96,16 +96,16 @@ def convert_one(benchmark: str, repo_root: Path, out_dir: Path) -> bool:
         f.write("\n")
     print(f"[{benchmark}] Wrote {len(connections)} connections to {connections_path}")
 
-    # --- Read context and hint ---
-    context = ""
-    context_path = bench_dir / "db_description.txt"
-    if context_path.exists():
-        context = context_path.read_text().strip()
+    # --- Read documentation and additional docs ---
+    docs = ""
+    docs_path = bench_dir / "db_description.txt"
+    if docs_path.exists():
+        docs = docs_path.read_text().strip()
 
-    hint = ""
-    hint_path = bench_dir / "db_description_withhint.txt"
-    if hint_path.exists():
-        hint = hint_path.read_text().strip()
+    additional_docs = ""
+    additional_docs_path = bench_dir / "db_description_withhint.txt"
+    if additional_docs_path.exists():
+        additional_docs = additional_docs_path.read_text().strip()
 
     # --- Write input JSONL ---
     query_dirs = sorted(
@@ -133,8 +133,8 @@ def convert_one(benchmark: str, repo_root: Path, out_dir: Path) -> bool:
                 "query_id": qdir.name,
                 "user_message": user_message,
                 "allowed_connections": allowed_connections,
-                "context": context,
-                "hint": hint,
+                "docs": docs,
+                "additional_docs": additional_docs,
             }
             out.write(json.dumps(record) + "\n")
             count += 1
