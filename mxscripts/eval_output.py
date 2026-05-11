@@ -17,6 +17,7 @@ import argparse
 import importlib.util
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 
@@ -62,16 +63,20 @@ def extract_answer(log: list) -> str | None:
     return None
 
 
-def load_validator(validate_py: Path):
+def load_validator(validate_py: Path, repo_root: Path):
     """Dynamically load a validate.py and return its validate function."""
+    root_str = str(repo_root)
+    if root_str not in sys.path:
+        sys.path.insert(0, root_str)
     spec = importlib.util.spec_from_file_location("validator", str(validate_py))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod.validate
 
 
-def evaluate_one(benchmark: str, repo_root: Path) -> tuple[int, int, int] | None:
-    """Returns (passed, failed, errors) or None if the benchmark was skipped."""
+def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[int, int, int] | None:
+    """Returns (passed, failed, errors) or None if the benchmark was skipped.
+    Appends per-query result dicts to all_results for the combined output file."""
     output_path = repo_root / "mxdatasets" / f"{benchmark}_output.jsonl"
     bench_dir = repo_root / f"query_{benchmark}"
 
@@ -115,7 +120,7 @@ def evaluate_one(benchmark: str, repo_root: Path) -> tuple[int, int, int] | None
             continue
 
         try:
-            validator = load_validator(validate_py)
+            validator = load_validator(validate_py, repo_root)
             is_valid, reason = validator(answer)
         except Exception as e:
             print(f"  [{query_id}] ERROR - validator raised: {e}")
@@ -134,10 +139,8 @@ def evaluate_one(benchmark: str, repo_root: Path) -> tuple[int, int, int] | None
         line["eval"] = {"pass": is_valid, "reason": reason}
         processed_lines.append(line)
 
-    processed_path = repo_root / "mxdatasets" / f"{benchmark}_output_processed.jsonl"
-    with open(processed_path, "w") as f:
-        for pl in processed_lines:
-            f.write(json.dumps(pl) + "\n")
+    for pl in processed_lines:
+        all_results.append({"benchmark": benchmark, **pl})
 
     total = passed + failed + errors
     if total:
@@ -172,9 +175,10 @@ def main():
 
     totals = {"passed": 0, "failed": 0, "errors": 0}
     per_bench: list[tuple[str, int, int, int]] = []
+    all_results: list[dict] = []
 
     for b in benchmarks:
-        result = evaluate_one(b, repo_root)
+        result = evaluate_one(b, repo_root, all_results)
         if result is None:
             continue
         p, f_, e = result
@@ -195,6 +199,14 @@ def main():
         rate = f"{totals['passed']/grand_total*100:.1f}%" if grand_total else "-"
         print("-" * 60)
         print(f"{'TOTAL':<24}{totals['passed']:>6}{totals['failed']:>6}{totals['errors']:>6}{grand_total:>7}{rate:>8}")
+
+    if all_results:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        evalrun_path = out_dir / f"evalrun_{timestamp}.jsonl"
+        with open(evalrun_path, "w") as f:
+            for r in all_results:
+                f.write(json.dumps(r) + "\n")
+        print(f"\nResults saved to {evalrun_path}")
 
 
 if __name__ == "__main__":
