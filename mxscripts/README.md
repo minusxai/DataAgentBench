@@ -9,6 +9,11 @@ uv run mxscripts/convert_to_jsonl.py <benchmark> [<benchmark> ...]
 uv run mxscripts/convert_to_jsonl.py --all
 ```
 
+Install pyaml
+```bash
+uv pip install pyyaml
+```
+
 Example:
 ```bash
 uv run mxscripts/convert_to_jsonl.py stockindex stockmarket
