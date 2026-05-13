@@ -71,6 +71,12 @@ PYTHONPATH=. uv run mxscripts/eval_output.py --all
 and prints a per-benchmark summary plus a grand total.
 
 For each benchmark it reads `mxdatasets/<benchmark>_output.jsonl`, runs each
-query's `query_<benchmark>/<query_id>/validate.py`, and writes
-`mxdatasets/<benchmark>_output_processed.jsonl` (original output + `eval` key
-with pass/fail and reason).
+query's `query_<benchmark>/<query_id>/validate.py`, and writes a combined
+results JSONL (original output + `eval` key with pass/fail and reason).
+
+By default the combined results are written to
+`mxdatasets/evalrun_<timestamp>.jsonl`. Pass `--file` to choose a custom path:
+
+```bash
+PYTHONPATH=. uv run mxscripts/eval_output.py --all --file ~/Downloads/output.jsonl
+```

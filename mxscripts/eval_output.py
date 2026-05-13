@@ -154,6 +154,7 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate agent output against DAB validators")
     parser.add_argument("benchmarks", nargs="*", help="Sub-benchmark name(s), e.g. stockindex stockmarket")
     parser.add_argument("--all", action="store_true", help="Evaluate every benchmark with an output file in mxdatasets/")
+    parser.add_argument("--file", type=str, default=None, help="Path to write the combined results JSONL (default: mxdatasets/evalrun_<timestamp>.jsonl)")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -201,8 +202,12 @@ def main():
         print(f"{'TOTAL':<24}{totals['passed']:>6}{totals['failed']:>6}{totals['errors']:>6}{grand_total:>7}{rate:>8}")
 
     if all_results:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        evalrun_path = out_dir / f"evalrun_{timestamp}.jsonl"
+        if args.file:
+            evalrun_path = Path(args.file).expanduser().resolve()
+            evalrun_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            evalrun_path = out_dir / f"evalrun_{timestamp}.jsonl"
         with open(evalrun_path, "w") as f:
             for r in all_results:
                 f.write(json.dumps(r) + "\n")
