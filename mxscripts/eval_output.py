@@ -108,17 +108,33 @@ def evaluate_log(validate_py: Path, repo_root: Path, log: list) -> tuple[str, st
     return ("pass" if is_valid else "fail", reason)
 
 
-def _emit(line: dict, log: list, outcome: str, reason: str, processed_lines: list) -> None:
+def _emit(
+    line: dict,
+    log: list,
+    outcome: str,
+    reason: str,
+    processed_lines: list,
+    failure_rate: float,
+) -> None:
     """Build one evalrun row from a single conversation log + verdict.
 
     Always emits singular `log` (never `logs`), so the resulting evalrun
     file is importable by the /benchmark viewer regardless of whether the
     source row was single-run or multi-run.
+
+    `failure_rate` is the percentage of runs that did NOT pass (0..100).
+    For single-run rows: 0 on pass, 100 on fail/error. For multi-run rows:
+    `(non_pass_runs / total_runs) * 100`. Stored alongside the verdict so
+    flakiness is visible without re-evaluating.
     """
     new_line = {**line}
     new_line.pop("logs", None)
     new_line["log"] = log
-    new_line["eval"] = {"pass": outcome == "pass", "reason": reason}
+    new_line["eval"] = {
+        "pass": outcome == "pass",
+        "reason": reason,
+        "failure_rate": failure_rate,
+    }
     processed_lines.append(new_line)
 
 
@@ -148,7 +164,7 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
         if not query_id:
             print("  [???] SKIP - no query_id in output line", file=sys.stderr)
             stub_log = line.get("log") or (line.get("logs", [[]])[0] if line.get("logs") else [])
-            _emit(line, stub_log, "fail", "no query_id in output", processed_lines)
+            _emit(line, stub_log, "fail", "no query_id in output", processed_lines, 100.0)
             failed += 1
             continue
 
@@ -158,7 +174,7 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
         if not validate_py.exists():
             print(f"  [{query_id}] SKIP - no validate.py")
             stub_log = line.get("log") or (line.get("logs", [[]])[0] if line.get("logs") else [])
-            _emit(line, stub_log, "fail", "no validate.py", processed_lines)
+            _emit(line, stub_log, "fail", "no validate.py", processed_lines, 100.0)
             failed += 1
             continue
 
@@ -167,12 +183,13 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
         #   - all pass     -> first log, pass
         #   - any non-pass -> first non-pass log (its verdict)
         # One-row-per-query_id keeps the pass-rate honest (denominator =
-        # query count, same as single-run).
+        # query count, same as single-run). `failure_rate` carries the
+        # per-query flakiness (non-pass / total * 100).
         if isinstance(line.get("logs"), list):
             logs: list = line["logs"]
             if not logs:
                 print(f"  [{query_id}] ERROR - empty `logs` array")
-                _emit(line, [], "error", "empty logs array", processed_lines)
+                _emit(line, [], "error", "empty logs array", processed_lines, 100.0)
                 errors += 1
                 continue
 
@@ -184,12 +201,14 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
             n_pass = outcomes.count("pass")
             n_fail = outcomes.count("fail")
             n_err = outcomes.count("error")
+            n_non_pass = len(logs) - n_pass
+            failure_rate = (n_non_pass / len(logs)) * 100.0
 
             if all(o == "pass" for o in outcomes):
                 (_, reason), log = evaluations[0]
-                _emit(line, log, "pass", reason, processed_lines)
+                _emit(line, log, "pass", reason, processed_lines, failure_rate)
                 passed += 1
-                print(f"  [{query_id}] PASS ({n_pass}/{len(logs)} runs) - {reason}")
+                print(f"  [{query_id}] PASS ({n_pass}/{len(logs)} runs, failure_rate={failure_rate:.1f}%) - {reason}")
             else:
                 # First non-pass run. Its outcome (fail or error) becomes
                 # this query's verdict; later runs are ignored.
@@ -199,19 +218,21 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
                 )
                 assert first_bad is not None  # not-all-pass guarantees one
                 (outcome, reason), log = first_bad
-                _emit(line, log, outcome, reason, processed_lines)
+                _emit(line, log, outcome, reason, processed_lines, failure_rate)
                 if outcome == "fail":
                     failed += 1
                 else:
                     errors += 1
                 status = outcome.upper()
-                print(f"  [{query_id}] {status} ({n_pass}/{len(logs)} runs passed, fail={n_fail} err={n_err}) - {reason}")
+                print(f"  [{query_id}] {status} ({n_pass}/{len(logs)} runs passed, fail={n_fail} err={n_err}, failure_rate={failure_rate:.1f}%) - {reason}")
             continue
 
         # Single-run row (legacy / TIMES_RUN=1): one `log`, one verdict.
+        # failure_rate collapses to 0 (pass) or 100 (non-pass).
         log = line.get("log", [])
         outcome, reason = evaluate_log(validate_py, repo_root, log)
-        _emit(line, log, outcome, reason, processed_lines)
+        single_failure_rate = 0.0 if outcome == "pass" else 100.0
+        _emit(line, log, outcome, reason, processed_lines, single_failure_rate)
         if outcome == "pass":
             passed += 1
         elif outcome == "fail":
