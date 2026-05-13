@@ -47,11 +47,13 @@ cd /path/to/minusx-bi-new/frontend
 DAB_BENCH_BASE_DIR=/path/to/DataAgentBench/mxdatasets npm run benchmark:dab
 ```
 
-The agent supports resume (skips rows already persisted), per-row /
-per-dataset timeouts, dataset filtering, and a row-limit cap. See
-[`frontend/benchmarks/README.md`](https://github.com/minusxai/minusx-bi-new/blob/main/frontend/benchmarks/README.md)
+The agent supports resume (skips rows already persisted), per-run /
+per-dataset timeouts, dataset filtering, multi-run (`DAB_TIMES_RUN`)
+to measure flakiness, and a global LLM-call cap (`MAX_LLM_CONCURRENCY`).
+See [`frontend/benchmarks/README.md`](https://github.com/minusxai/minusx-bi-new/blob/main/frontend/benchmarks/README.md)
 for the full env-var reference (`DAB_BENCH_DATASETS`, `DAB_BENCH_RERUN`,
-`DAB_QUESTION_TIMEOUT`, `DAB_DATASET_TIMEOUT`, etc.).
+`DAB_QUESTION_TIMEOUT`, `DAB_DATASET_TIMEOUT`, `DAB_TIMES_RUN`,
+`MAX_LLM_CONCURRENCY`, etc.).
 
 ## 3. Evaluate agent output
 
@@ -72,7 +74,23 @@ and prints a per-benchmark summary plus a grand total.
 
 For each benchmark it reads `mxdatasets/<benchmark>_output.jsonl`, runs each
 query's `query_<benchmark>/<query_id>/validate.py`, and writes a combined
-results JSONL (original output + `eval` key with pass/fail and reason).
+results JSONL (original output + `eval` key with `pass`, `reason`, and
+`failure_rate`).
+
+### Single-run vs multi-run inputs
+
+- **Single-run rows** (`log` field, produced when `DAB_TIMES_RUN` is
+  unset or `1`): one verdict per row. `failure_rate` is `0` on pass,
+  `100` otherwise.
+- **Multi-run rows** (`logs` field, produced when `DAB_TIMES_RUN > 1`):
+  every conversation in `logs` is evaluated. The script emits **exactly
+  one evalrun row per `query_id`**:
+  - all runs pass → row carries the first log, `pass=true`, `failure_rate=0`.
+  - any run fails → row carries the first failing log + its verdict,
+    and `failure_rate = (non_pass_runs / total_runs) * 100`.
+
+The evalrun JSONL always has singular `log` (never `logs`), so it's
+importable into `/benchmark` regardless of `DAB_TIMES_RUN`.
 
 By default the combined results are written to
 `mxdatasets/evalrun_<timestamp>.jsonl`. Pass `--file` to choose a custom path:
