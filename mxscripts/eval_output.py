@@ -7,8 +7,26 @@ Usage:
 Reads:  mxdatasets/<benchmark>_output.jsonl
 Uses:   query_<benchmark>/query{N}/validate.py  (one per line)
 
-Each output line must have:
-    {"input": {"user_message": "..."}, "log": [...], "duration_ms": ...}
+Each output line must have one of:
+    {"input": {...}, "log":  [...],   "duration_ms": ...}    # single-run
+    {"input": {...}, "logs": [[...]], "duration_ms": ...}    # multi-run
+
+For multi-run rows (`logs` is an array of conversation logs, produced by
+the bench runner with TIMES_RUN/DAB_TIMES_RUN > 1) we evaluate each run
+and collapse to **one row per query_id**:
+  - if every run passes -> emit one row carrying the first log as `log`
+  - if any run fails    -> emit one row carrying the first failing run's
+                           log as `log` (its verdict becomes the row's
+                           verdict). Subsequent runs — pass or fail —
+                           are not surfaced here; the raw `_output.jsonl`
+                           still has every log if you need to inspect
+                           flakiness.
+
+Keeping one row per query_id means the overall pass-rate calculation
+matches the single-run case (rows in == queries; passed/total is honest).
+
+Each emitted evalrun row always has singular `log` (never `logs`), so the
+output remains importable by the /benchmark viewer downstream.
 
 The final answer is extracted from the last assistant message in the log.
 """
@@ -74,9 +92,40 @@ def load_validator(validate_py: Path, repo_root: Path):
     return mod.validate
 
 
+def evaluate_log(validate_py: Path, repo_root: Path, log: list) -> tuple[str, str]:
+    """Evaluate a single conversation log.
+
+    Returns (outcome, reason) where outcome is one of: 'pass', 'fail', 'error'.
+    """
+    answer = extract_answer(log)
+    if answer is None:
+        return ("error", "no answer in log")
+    try:
+        validator = load_validator(validate_py, repo_root)
+        is_valid, reason = validator(answer)
+    except Exception as e:
+        return ("error", str(e))
+    return ("pass" if is_valid else "fail", reason)
+
+
+def _emit(line: dict, log: list, outcome: str, reason: str, processed_lines: list) -> None:
+    """Build one evalrun row from a single conversation log + verdict.
+
+    Always emits singular `log` (never `logs`), so the resulting evalrun
+    file is importable by the /benchmark viewer regardless of whether the
+    source row was single-run or multi-run.
+    """
+    new_line = {**line}
+    new_line.pop("logs", None)
+    new_line["log"] = log
+    new_line["eval"] = {"pass": outcome == "pass", "reason": reason}
+    processed_lines.append(new_line)
+
+
 def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[int, int, int] | None:
-    """Returns (passed, failed, errors) or None if the benchmark was skipped.
-    Appends per-query result dicts to all_results for the combined output file."""
+    """Returns (passed, failed, errors) counted across emitted evalrun rows,
+    or None if the benchmark was skipped. Appends per-query result dicts to
+    all_results for the combined output file."""
     output_path = repo_root / "mxdatasets" / f"{benchmark}_output.jsonl"
     bench_dir = repo_root / f"query_{benchmark}"
 
@@ -92,14 +141,15 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
     passed = 0
     failed = 0
     errors = 0
-    processed_lines = []
+    processed_lines: list[dict] = []
 
     for line in lines:
         query_id = line.get("input", {}).get("query_id")
         if not query_id:
-            print(f"  [???] SKIP - no query_id in output line", file=sys.stderr)
-            line["eval"] = {"pass": False, "reason": "no query_id in output"}
-            processed_lines.append(line)
+            print("  [???] SKIP - no query_id in output line", file=sys.stderr)
+            stub_log = line.get("log") or (line.get("logs", [[]])[0] if line.get("logs") else [])
+            _emit(line, stub_log, "fail", "no query_id in output", processed_lines)
+            failed += 1
             continue
 
         qdir = bench_dir / query_id
@@ -107,37 +157,69 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
 
         if not validate_py.exists():
             print(f"  [{query_id}] SKIP - no validate.py")
-            line["eval"] = {"pass": False, "reason": "no validate.py"}
-            processed_lines.append(line)
-            continue
-
-        answer = extract_answer(line.get("log", []))
-        if answer is None:
-            print(f"  [{query_id}] ERROR - no answer found in log")
-            errors += 1
-            line["eval"] = {"pass": False, "reason": "no answer in log"}
-            processed_lines.append(line)
-            continue
-
-        try:
-            validator = load_validator(validate_py, repo_root)
-            is_valid, reason = validator(answer)
-        except Exception as e:
-            print(f"  [{query_id}] ERROR - validator raised: {e}")
-            errors += 1
-            line["eval"] = {"pass": False, "reason": str(e)}
-            processed_lines.append(line)
-            continue
-
-        status = "PASS" if is_valid else "FAIL"
-        if is_valid:
-            passed += 1
-        else:
+            stub_log = line.get("log") or (line.get("logs", [[]])[0] if line.get("logs") else [])
+            _emit(line, stub_log, "fail", "no validate.py", processed_lines)
             failed += 1
+            continue
 
+        # Multi-run row: `logs` is an array of conversation logs, one per
+        # repeat. Evaluate each; emit exactly one evalrun row:
+        #   - all pass     -> first log, pass
+        #   - any non-pass -> first non-pass log (its verdict)
+        # One-row-per-query_id keeps the pass-rate honest (denominator =
+        # query count, same as single-run).
+        if isinstance(line.get("logs"), list):
+            logs: list = line["logs"]
+            if not logs:
+                print(f"  [{query_id}] ERROR - empty `logs` array")
+                _emit(line, [], "error", "empty logs array", processed_lines)
+                errors += 1
+                continue
+
+            evaluations = [
+                (evaluate_log(validate_py, repo_root, log), log)
+                for log in logs
+            ]
+            outcomes = [outcome for ((outcome, _), _) in evaluations]
+            n_pass = outcomes.count("pass")
+            n_fail = outcomes.count("fail")
+            n_err = outcomes.count("error")
+
+            if all(o == "pass" for o in outcomes):
+                (_, reason), log = evaluations[0]
+                _emit(line, log, "pass", reason, processed_lines)
+                passed += 1
+                print(f"  [{query_id}] PASS ({n_pass}/{len(logs)} runs) - {reason}")
+            else:
+                # First non-pass run. Its outcome (fail or error) becomes
+                # this query's verdict; later runs are ignored.
+                first_bad = next(
+                    ((res, log) for (res, log) in evaluations if res[0] != "pass"),
+                    None,
+                )
+                assert first_bad is not None  # not-all-pass guarantees one
+                (outcome, reason), log = first_bad
+                _emit(line, log, outcome, reason, processed_lines)
+                if outcome == "fail":
+                    failed += 1
+                else:
+                    errors += 1
+                status = outcome.upper()
+                print(f"  [{query_id}] {status} ({n_pass}/{len(logs)} runs passed, fail={n_fail} err={n_err}) - {reason}")
+            continue
+
+        # Single-run row (legacy / TIMES_RUN=1): one `log`, one verdict.
+        log = line.get("log", [])
+        outcome, reason = evaluate_log(validate_py, repo_root, log)
+        _emit(line, log, outcome, reason, processed_lines)
+        if outcome == "pass":
+            passed += 1
+        elif outcome == "fail":
+            failed += 1
+        else:
+            errors += 1
+        status = {"pass": "PASS", "fail": "FAIL", "error": "ERROR"}[outcome]
         print(f"  [{query_id}] {status} - {reason}")
-        line["eval"] = {"pass": is_valid, "reason": reason}
-        processed_lines.append(line)
 
     for pl in processed_lines:
         all_results.append({"benchmark": benchmark, **pl})
