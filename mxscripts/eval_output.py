@@ -13,17 +13,8 @@ Each output line must have one of:
 
 For multi-run rows (`logs` is an array of conversation logs, produced by
 the bench runner with TIMES_RUN/DAB_TIMES_RUN > 1) we evaluate each run
-and collapse to **one row per query_id**:
-  - if every run passes -> emit one row carrying the first log as `log`
-  - if any run fails    -> emit one row carrying the first failing run's
-                           log as `log` (its verdict becomes the row's
-                           verdict). Subsequent runs — pass or fail —
-                           are not surfaced here; the raw `_output.jsonl`
-                           still has every log if you need to inspect
-                           flakiness.
-
-Keeping one row per query_id means the overall pass-rate calculation
-matches the single-run case (rows in == queries; passed/total is honest).
+and emit **one row per run**, each with singular `log` and `eval.run_idx`
+(0-based). All other keys from the original line are duplicated across rows.
 
 Each emitted evalrun row always has singular `log` (never `logs`), so the
 output remains importable by the /benchmark viewer downstream.
@@ -141,12 +132,16 @@ def _emit(
     reason: str,
     processed_lines: list,
     failure_rate: float,
+    run_idx: int = 0,
 ) -> None:
     """Build one evalrun row from a single conversation log + verdict.
 
     Always emits singular `log` (never `logs`), so the resulting evalrun
     file is importable by the /benchmark viewer regardless of whether the
     source row was single-run or multi-run.
+
+    `run_idx` identifies which run this row corresponds to (0-based).
+    For single-run rows it is always 0.
 
     `failure_rate` is the percentage of runs that did NOT pass (0..100).
     For single-run rows: 0 on pass, 100 on fail/error. For multi-run rows:
@@ -160,6 +155,7 @@ def _emit(
         "pass": outcome == "pass",
         "reason": reason,
         "failure_rate": failure_rate,
+        "run_idx": run_idx,
     }
     processed_lines.append(new_line)
 
@@ -228,7 +224,7 @@ def evaluate_one(
             logs: list = line["logs"]
             if not logs:
                 print(f"  [{query_id}] ERROR - empty `logs` array")
-                _emit(line, [], "error", "empty logs array", processed_lines, 100.0)
+                _emit(line, [], "error", "empty logs array", processed_lines, 100.0, run_idx=0)
                 errors += 1
                 query_accuracies[query_id] = 0.0
                 continue
@@ -243,32 +239,19 @@ def evaluate_one(
             n_err = outcomes.count("error")
             n_non_pass = len(logs) - n_pass
             failure_rate = (n_non_pass / len(logs)) * 100.0
-            # Leaderboard-style score for this query: fraction of runs
-            # that passed validation (errors count as 0, matching DAB's
-            # `no_tool_call → invalid` convention).
             query_accuracies[query_id] = n_pass / len(logs)
 
-            if all(o == "pass" for o in outcomes):
-                (_, reason), log = evaluations[0]
-                _emit(line, log, "pass", reason, processed_lines, failure_rate)
-                passed += 1
-                print(f"  [{query_id}] PASS ({n_pass}/{len(logs)} runs, failure_rate={failure_rate:.1f}%) - {reason}")
-            else:
-                # First non-pass run. Its outcome (fail or error) becomes
-                # this query's verdict; later runs are ignored.
-                first_bad = next(
-                    ((res, log) for (res, log) in evaluations if res[0] != "pass"),
-                    None,
-                )
-                assert first_bad is not None  # not-all-pass guarantees one
-                (outcome, reason), log = first_bad
-                _emit(line, log, outcome, reason, processed_lines, failure_rate)
-                if outcome == "fail":
+            # Emit one row per run (all runs, not just a representative).
+            for run_idx, ((outcome, reason), log) in enumerate(evaluations):
+                _emit(line, log, outcome, reason, processed_lines, failure_rate, run_idx=run_idx)
+                if outcome == "pass":
+                    passed += 1
+                elif outcome == "fail":
                     failed += 1
                 else:
                     errors += 1
-                status = outcome.upper()
-                print(f"  [{query_id}] {status} ({n_pass}/{len(logs)} runs passed, fail={n_fail} err={n_err}, failure_rate={failure_rate:.1f}%) - {reason}")
+
+            print(f"  [{query_id}] {n_pass}/{len(logs)} runs passed (fail={n_fail} err={n_err}, failure_rate={failure_rate:.1f}%)")
             continue
 
         # Single-run row (legacy / TIMES_RUN=1): one `log`, one verdict.
@@ -276,7 +259,7 @@ def evaluate_one(
         log = line.get("log", [])
         outcome, reason = evaluate_log(validate_py, repo_root, log)
         single_failure_rate = 0.0 if outcome == "pass" else 100.0
-        _emit(line, log, outcome, reason, processed_lines, single_failure_rate)
+        _emit(line, log, outcome, reason, processed_lines, single_failure_rate, run_idx=0)
         if outcome == "pass":
             passed += 1
         elif outcome == "fail":
