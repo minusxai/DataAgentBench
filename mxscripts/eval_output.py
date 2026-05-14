@@ -294,7 +294,8 @@ def main():
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
-    out_dir = repo_root / "mxdatasets"
+    out_dir = repo_root / "mxdatasets" / "final_evals"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.all:
         benchmarks = sorted(
