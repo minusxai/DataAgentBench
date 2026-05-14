@@ -368,25 +368,29 @@ def main():
     #   - macro-by-query: mean across every query regardless of dataset
     #     (each query weighted equally — useful when dataset sizes vary
     #     and you want raw per-question accuracy).
-    if per_bench_accuracies:
-        non_empty = [(b, accs) for b, accs in per_bench_accuracies if accs]
-        if non_empty:
-            print(f"\n{'='*60}")
-            print("Leaderboard score  (mean per-query accuracy; matches avg_accuracy.py)")
-            print(f"{'benchmark':<24}{'score':>8}{'queries':>10}")
-            print("-" * 60)
-            dataset_means: list[float] = []
-            all_query_accs: list[float] = []
-            for b, accs in non_empty:
+    # Always printed alongside the strict-pass table whenever the strict
+    # table prints, even if every benchmark is empty — placeholders ('-')
+    # make the new column visible so users can confirm the wiring.
+    if len(per_bench) > 1:
+        print(f"\n{'='*60}")
+        print("Leaderboard score  (mean per-query accuracy; matches avg_accuracy.py)")
+        print(f"{'benchmark':<24}{'score':>8}{'queries':>10}")
+        print("-" * 60)
+        dataset_means: list[float] = []
+        all_query_accs: list[float] = []
+        for b, accs in per_bench_accuracies:
+            if accs:
                 mean = sum(accs.values()) / len(accs)
                 dataset_means.append(mean)
                 all_query_accs.extend(accs.values())
                 print(f"{b:<24}{mean:>8.3f}{len(accs):>10}")
-            print("-" * 60)
-            macro_ds = sum(dataset_means) / len(dataset_means)
-            macro_q = sum(all_query_accs) / len(all_query_accs) if all_query_accs else 0.0
-            print(f"{'MEAN (macro, datasets)':<24}{macro_ds:>8.3f}")
-            print(f"{'MEAN (macro, queries)':<24}{macro_q:>8.3f}{len(all_query_accs):>10}")
+            else:
+                print(f"{b:<24}{'-':>8}{0:>10}")
+        print("-" * 60)
+        macro_ds_str = f"{sum(dataset_means) / len(dataset_means):.3f}" if dataset_means else "-"
+        macro_q_str = f"{sum(all_query_accs) / len(all_query_accs):.3f}" if all_query_accs else "-"
+        print(f"{'MEAN (macro, datasets)':<24}{macro_ds_str:>8}")
+        print(f"{'MEAN (macro, queries)':<24}{macro_q_str:>8}{len(all_query_accs):>10}")
 
     if all_results:
         if args.file:
