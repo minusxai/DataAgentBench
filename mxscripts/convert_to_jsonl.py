@@ -44,12 +44,27 @@ def build_connections(db_clients: dict, bench_dir: Path) -> list[dict]:
         dialect = DB_TYPE_TO_DIALECT.get(db_type, db_type)
 
         if db_type in ("postgres", "postgresql"):
+            # `username` (not `user`) — MinusX's PostgresConnector reads
+            # `this.config.username`. Writing `user` here leaves the
+            # connector with `username: undefined`, which makes `pg.Pool`
+            # fall back to `PGUSER`/OS user and fail auth against the
+            # `dab-postgres` container.
+            #
+            # `ssl: false` — the local docker-compose Postgres is plain
+            # TCP, but the connector defaults to requesting SSL with
+            # `{ rejectUnauthorized: false }` (production-safe for hosted
+            # Postgres, all of which require SSL). Without this opt-out
+            # the connector errors with "The server does not support SSL
+            # connections" before auth is attempted. Keeping it scoped
+            # to per-connection config means production users with cloud
+            # Postgres are unaffected.
             config = {
                 "host": PG_HOST,
                 "port": PG_PORT,
                 "database": info.get("db_name", ""),
-                "user": PG_USER,
+                "username": PG_USER,
                 "password": PG_PASSWORD,
+                "ssl": False,
             }
         elif db_type in ("mongo", "mongodb"):
             config = {
