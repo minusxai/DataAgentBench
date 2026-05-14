@@ -300,7 +300,7 @@ def main():
     if args.all:
         benchmarks = sorted(
             p.name[:-len("_output.jsonl")]
-            for p in out_dir.glob("*_output.jsonl")
+            for p in out_dir.glob("../*_output.jsonl")
             if not p.name.endswith("_output_processed.jsonl")
         )
         if not benchmarks:
