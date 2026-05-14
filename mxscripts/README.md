@@ -47,13 +47,15 @@ cd /path/to/minusx-bi-new/frontend
 DAB_BENCH_BASE_DIR=/path/to/DataAgentBench/mxdatasets npm run benchmark:dab
 ```
 
-The agent supports resume (skips rows already persisted), per-run /
-per-dataset timeouts, dataset filtering, multi-run (`DAB_TIMES_RUN`)
-to measure flakiness, and a global LLM-call cap (`MAX_LLM_CONCURRENCY`).
+The agent supports resume (skips rows already persisted), a per-run
+timeout, dataset filtering, multi-run (`DAB_TIMES_RUN`) to measure
+flakiness, cross-check mode (`DAB_DOUBLE_CHECK`), and two stacked
+concurrency caps (`MAX_AGENTS_CONCURRENCY` for orchestrator runs,
+`MAX_LLM_CONCURRENCY` for provider calls).
 See [`frontend/benchmarks/README.md`](https://github.com/minusxai/minusx-bi-new/blob/main/frontend/benchmarks/README.md)
 for the full env-var reference (`DAB_BENCH_DATASETS`, `DAB_BENCH_RERUN`,
-`DAB_QUESTION_TIMEOUT`, `DAB_DATASET_TIMEOUT`, `DAB_TIMES_RUN`,
-`MAX_LLM_CONCURRENCY`, etc.).
+`DAB_QUESTION_TIMEOUT`, `DAB_TIMES_RUN`, `DAB_DOUBLE_CHECK`,
+`MAX_AGENTS_CONCURRENCY`, `MAX_LLM_CONCURRENCY`, etc.).
 
 ## 3. Evaluate agent output
 
@@ -70,7 +72,24 @@ PYTHONPATH=. uv run mxscripts/eval_output.py --all
 > infrastructure errors rather than honest pass/fail.
 
 `--all` evaluates every benchmark that has an `_output.jsonl` in `mxdatasets/`
-and prints a per-benchmark summary plus a grand total.
+and prints **two** summary tables:
+
+1. **Strict pass-rate** — current/historical scoring. A query "passes"
+   iff every run (when `DAB_TIMES_RUN > 1`) passes its validator. One
+   query in the table contributes either 0 or 1. Punishes any flakiness.
+2. **Leaderboard score** — matches `stats_scripts/avg_accuracy.py` and
+   the DataAgentBench leaderboard methodology. Per-query accuracy is
+   `n_pass / n_runs` (fractional; errors count as 0). Per-dataset score
+   is the mean of its per-query accuracies (macro over queries). The
+   overall row emits **both** macro-by-dataset (each dataset weighted
+   equally) and macro-by-query (each query weighted equally) so you can
+   reconcile against whichever methodology the leaderboard maintainers
+   use for headline numbers. Use this when comparing against DAB's
+   published leaderboard rows.
+
+Single-benchmark runs print the per-benchmark leaderboard score inline
+under the per-row results; the two summary tables only appear when more
+than one benchmark is evaluated in the same invocation.
 
 For each benchmark it reads `mxdatasets/<benchmark>_output.jsonl`, runs each
 query's `query_<benchmark>/<query_id>/validate.py`, and writes a combined

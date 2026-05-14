@@ -34,9 +34,31 @@ The final answer is extracted from the last assistant message in the log.
 import argparse
 import importlib.util
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
+
+
+# Marker that opens the canonical answer block in BenchmarkAnalystAgent's
+# replies (`TL;DR: <answer>\nAnalysis: <details>`). Matched case-insensitively;
+# the regex also consumes the immediate `:` and any whitespace, so the slice
+# starts on the answer body itself — validators never see the marker or its
+# punctuation. If no marker exists, the whole text is returned unchanged.
+_TLDR_RE = re.compile(r"TL;DR:?\s*", re.IGNORECASE)
+
+
+def _slice_from_tldr(text: str) -> str:
+    """If `text` contains a `TL;DR` marker (case-insensitive), return the
+    suffix that begins **after** the marker (and its `:` / whitespace).
+    Otherwise return `text` unchanged. Used to strip the chain-of-thought
+    / preamble portion of an assistant reply so the validator only sees
+    the canonical answer block — intermediate numbers and hypotheses in
+    the preamble are a common source of false-positive substring matches
+    in DAB validators.
+    """
+    match = _TLDR_RE.search(text)
+    return text[match.end():] if match else text
 
 
 def extract_answer(log: list) -> str | None:
@@ -45,6 +67,10 @@ def extract_answer(log: list) -> str | None:
     Supports two log formats:
     - New format: entries with _type="task_result" and result.content_blocks
     - Legacy format: entries with role="assistant" and content list/string
+
+    The returned text is sliced from the first `TL;DR` marker onward when
+    present, so validators see the canonical answer block (and not the
+    chain-of-thought preamble that precedes it).
     """
     # New format: look for last task_result with content_blocks
     for entry in reversed(log):
@@ -60,7 +86,7 @@ def extract_answer(log: list) -> str | None:
                 ]
                 text = "\n".join(text_parts).strip()
                 if text:
-                    return text
+                    return _slice_from_tldr(text)
 
     # Legacy format: last assistant message
     for entry in reversed(log):
@@ -76,7 +102,7 @@ def extract_answer(log: list) -> str | None:
         if not text.strip():
             continue
 
-        return text.strip()
+        return _slice_from_tldr(text.strip())
 
     return None
 
@@ -138,9 +164,15 @@ def _emit(
     processed_lines.append(new_line)
 
 
-def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[int, int, int] | None:
-    """Returns (passed, failed, errors) counted across emitted evalrun rows,
-    or None if the benchmark was skipped. Appends per-query result dicts to
+def evaluate_one(
+    benchmark: str, repo_root: Path, all_results: list
+) -> tuple[int, int, int, dict[str, float]] | None:
+    """Returns (passed, failed, errors, query_accuracies) — the first three
+    counted across emitted evalrun rows under strict-pass semantics
+    (query passes iff ALL runs pass), the fourth is a dict
+    `{query_id: pass_rate ∈ [0, 1]}` for leaderboard-style scoring
+    (matches `stats_scripts/accuracy.py` per-query accuracy). Returns
+    None if the benchmark was skipped. Appends per-query result dicts to
     all_results for the combined output file."""
     output_path = repo_root / "mxdatasets" / f"{benchmark}_output.jsonl"
     bench_dir = repo_root / f"query_{benchmark}"
@@ -158,6 +190,9 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
     failed = 0
     errors = 0
     processed_lines: list[dict] = []
+    # query_id -> n_pass / n_runs. Errors count as 0 (matches DAB's
+    # `no_tool_call` → invalid convention in stats_scripts/accuracy.py).
+    query_accuracies: dict[str, float] = {}
 
     for line in lines:
         query_id = line.get("input", {}).get("query_id")
@@ -166,6 +201,9 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
             stub_log = line.get("log") or (line.get("logs", [[]])[0] if line.get("logs") else [])
             _emit(line, stub_log, "fail", "no query_id in output", processed_lines, 100.0)
             failed += 1
+            # No usable query_id → cannot key the leaderboard table; skip
+            # this row from per-query accuracy. (Doesn't happen on the
+            # well-formed benchmark output but kept defensive.)
             continue
 
         qdir = bench_dir / query_id
@@ -176,6 +214,7 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
             stub_log = line.get("log") or (line.get("logs", [[]])[0] if line.get("logs") else [])
             _emit(line, stub_log, "fail", "no validate.py", processed_lines, 100.0)
             failed += 1
+            query_accuracies[query_id] = 0.0
             continue
 
         # Multi-run row: `logs` is an array of conversation logs, one per
@@ -191,6 +230,7 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
                 print(f"  [{query_id}] ERROR - empty `logs` array")
                 _emit(line, [], "error", "empty logs array", processed_lines, 100.0)
                 errors += 1
+                query_accuracies[query_id] = 0.0
                 continue
 
             evaluations = [
@@ -203,6 +243,10 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
             n_err = outcomes.count("error")
             n_non_pass = len(logs) - n_pass
             failure_rate = (n_non_pass / len(logs)) * 100.0
+            # Leaderboard-style score for this query: fraction of runs
+            # that passed validation (errors count as 0, matching DAB's
+            # `no_tool_call → invalid` convention).
+            query_accuracies[query_id] = n_pass / len(logs)
 
             if all(o == "pass" for o in outcomes):
                 (_, reason), log = evaluations[0]
@@ -239,6 +283,9 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
             failed += 1
         else:
             errors += 1
+        # Single-run accuracy is 1.0 (pass) or 0.0 (fail/error) — same
+        # leaderboard semantics as the multi-run branch.
+        query_accuracies[query_id] = 1.0 if outcome == "pass" else 0.0
         status = {"pass": "PASS", "fail": "FAIL", "error": "ERROR"}[outcome]
         print(f"  [{query_id}] {status} - {reason}")
 
@@ -248,9 +295,12 @@ def evaluate_one(benchmark: str, repo_root: Path, all_results: list) -> tuple[in
     total = passed + failed + errors
     if total:
         print(f"  -> {passed}/{total} passed ({passed/total*100:.1f}%) | failed={failed} errors={errors}")
+        if query_accuracies:
+            mean_acc = sum(query_accuracies.values()) / len(query_accuracies)
+            print(f"  -> leaderboard score (mean per-query accuracy): {mean_acc:.3f}")
     else:
         print("  -> no queries evaluated")
-    return (passed, failed, errors)
+    return (passed, failed, errors, query_accuracies)
 
 
 def main():
@@ -279,20 +329,24 @@ def main():
 
     totals = {"passed": 0, "failed": 0, "errors": 0}
     per_bench: list[tuple[str, int, int, int]] = []
+    # benchmark -> {query_id: accuracy} for the leaderboard-style table.
+    per_bench_accuracies: list[tuple[str, dict[str, float]]] = []
     all_results: list[dict] = []
 
     for b in benchmarks:
         result = evaluate_one(b, repo_root, all_results)
         if result is None:
             continue
-        p, f_, e = result
+        p, f_, e, query_accs = result
         totals["passed"] += p
         totals["failed"] += f_
         totals["errors"] += e
         per_bench.append((b, p, f_, e))
+        per_bench_accuracies.append((b, query_accs))
 
     if len(per_bench) > 1:
         print(f"\n{'='*60}")
+        print("Strict pass-rate  (query passes iff ALL runs pass)")
         print(f"{'benchmark':<24}{'pass':>6}{'fail':>6}{'err':>6}{'total':>7}{'rate':>8}")
         print("-" * 60)
         for b, p, f_, e in per_bench:
@@ -303,6 +357,36 @@ def main():
         rate = f"{totals['passed']/grand_total*100:.1f}%" if grand_total else "-"
         print("-" * 60)
         print(f"{'TOTAL':<24}{totals['passed']:>6}{totals['failed']:>6}{totals['errors']:>6}{grand_total:>7}{rate:>8}")
+
+    # Leaderboard-style score: matches DataAgentBench/stats_scripts/avg_accuracy.py.
+    # Per-query accuracy = n_pass / n_runs (errors count as 0). Per-dataset
+    # score = mean of its per-query accuracies (macro across queries).
+    # Two overall aggregates emitted:
+    #   - macro-by-dataset: mean of per-dataset scores (each dataset
+    #     weighted equally — what avg_accuracy.py implies for the
+    #     headline "model X gets 0.128" leaderboard number).
+    #   - macro-by-query: mean across every query regardless of dataset
+    #     (each query weighted equally — useful when dataset sizes vary
+    #     and you want raw per-question accuracy).
+    if per_bench_accuracies:
+        non_empty = [(b, accs) for b, accs in per_bench_accuracies if accs]
+        if non_empty:
+            print(f"\n{'='*60}")
+            print("Leaderboard score  (mean per-query accuracy; matches avg_accuracy.py)")
+            print(f"{'benchmark':<24}{'score':>8}{'queries':>10}")
+            print("-" * 60)
+            dataset_means: list[float] = []
+            all_query_accs: list[float] = []
+            for b, accs in non_empty:
+                mean = sum(accs.values()) / len(accs)
+                dataset_means.append(mean)
+                all_query_accs.extend(accs.values())
+                print(f"{b:<24}{mean:>8.3f}{len(accs):>10}")
+            print("-" * 60)
+            macro_ds = sum(dataset_means) / len(dataset_means)
+            macro_q = sum(all_query_accs) / len(all_query_accs) if all_query_accs else 0.0
+            print(f"{'MEAN (macro, datasets)':<24}{macro_ds:>8.3f}")
+            print(f"{'MEAN (macro, queries)':<24}{macro_q:>8.3f}{len(all_query_accs):>10}")
 
     if all_results:
         if args.file:
