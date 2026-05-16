@@ -1,5 +1,6 @@
 # DAB: Data Agent Benchmark
 
+
 > 🌐 **Website & Leaderboard: [ucbepic.github.io/DataAgentBench](https://ucbepic.github.io/DataAgentBench/)**
 
 > 📄 **Paper: [arxiv.org/abs/2603.20576](https://arxiv.org/abs/2603.20576)**
@@ -7,7 +8,9 @@
 > 🔥 **DAB is the first benchmark for evaluating data agents on realistic, complex, data-oriented tasks. It is a collaborative effort between UC Berkeley and Hasura PromptQL.**
 
 > 🤝 **We welcome contributions to the leaderboard!
-Submit a Pull Request following the instruction below  to share your agent results and see them ranked on DAB.**
+Submit a Pull Request following the instructions below to share your agent results and see them ranked on DAB.**
+
+
 
 DAB captures **four core properties** of real-world enterprise data workloads across industries:
 
@@ -18,29 +21,35 @@ DAB captures **four core properties** of real-world enterprise data workloads ac
 
 Unlike prior SQL-only or single-database benchmarks, DAB stresses agents under **realistic enterprise data complexity**.
 
+<p align="center"><img src="docs/logo.png" width="400"/></p>
+
+
 
 ## 🏆 Leaderboard
 
-| Rank | Model          | Pass@1 | Date    | Submission |
-| ---- | -------------- | ------------------- | ------- | ---------- |
-| 1    | Pi Coding Agent (Claude-Opus-4.6) (5 trials/query) | 0.5603 | 2026-04-21 | [#31](https://github.com/ucbepic/DataAgentBench/pull/31) |
-| 2    | PromptQL (Gemini-3.1-Pro) (5 trials/query) | 0.543                | 2026-03-18 | [#24](https://github.com/ucbepic/DataAgentBench/pull/24) |
-| 3    | PromptQL (Claude-Opus-4.6) (5 trials/query) | 0.508                | 2026-03-02 | [#23](https://github.com/ucbepic/DataAgentBench/pull/23) |
-| 4    | Oracle Forge — Tenacious Intelligence (Claude-Sonnet-4.6) (5–7 trials/query) | 0.4554 | 2026-04-21 | [#32](https://github.com/ucbepic/DataAgentBench/pull/32) |
-| 5    | Claude-Opus-4.6 (5 trials/query) | 0.4376                | 2026-03-18 | [#22](https://github.com/ucbepic/DataAgentBench/pull/22) |
-| 6    | Gemini-3-Pro | 0.38           | 2026-03-02 | — |
-| 7    | GPT-5-mini     |     0.30           | 2026-03-02 | — |
-| 8    | GPT-5.2     |     0.25           | 2026-03-02 | — |
-| 9    | Kimi-K2     |     0.23           | 2026-03-02 | — |
-| 10   | Oracle Forge — Team Cohere (Gemini-2.0-Flash) (5 trials/query) | 0.128 | 2026-04-21 | [#38](https://github.com/ucbepic/DataAgentBench/pull/38) |
-| 11   | Gemini-2.5-Flash     |     0.09          | 2026-03-02 | — |
+| Rank | Model | Pass@1 | Trials/Query | Hints? | Date | Submission |
+| ---- | ----- | ------ | ------------ | ---------- | ---- | ---------- |
+| 1    | Altimate Code (Claude-Sonnet-4.6) | 0.6040 | 5 | Yes | 2026-05-10 | [#44](https://github.com/ucbepic/DataAgentBench/pull/44) |
+| 2    | Spacedock (Recce) (Claude-Opus-4.6) | 0.5773 | 5 | No | 2026-05-08 | [#47](https://github.com/ucbepic/DataAgentBench/pull/47) |
+| 3    | Pi Coding Agent (Claude-Opus-4.6) | 0.5603 | 5 | Yes | 2026-04-21 | [#31](https://github.com/ucbepic/DataAgentBench/pull/31) |
+| 4    | PromptQL (Gemini-3.1-Pro) | 0.543 | 5 | Yes | 2026-03-18 | [#24](https://github.com/ucbepic/DataAgentBench/pull/24) |
+| 5    | PromptQL (Claude-Opus-4.6) | 0.508 | 5 | Yes | 2026-03-02 | [#23](https://github.com/ucbepic/DataAgentBench/pull/23) |
+| 6    | Oracle Forge — Team PaLM (Gemini-3.1-Pro-Preview) | 0.4601 | 5 | Yes | 2026-05-10 | [#37](https://github.com/ucbepic/DataAgentBench/pull/37) |
+| 7    | Oracle Forge — Tenacious Intelligence (Claude-Sonnet-4.6) | 0.4554 | 5–7 | No | 2026-04-21 | [#32](https://github.com/ucbepic/DataAgentBench/pull/32) |
+| 8    | Claude-Opus-4.6 | 0.4376 | 5 | Yes | 2026-03-18 | [#22](https://github.com/ucbepic/DataAgentBench/pull/22) |
+| 9    | Gemini-3-Pro | 0.38 | 50 | Yes | 2026-03-02 | — |
+| 10   | GPT-5-mini | 0.30 | 50 | Yes | 2026-03-02 | — |
+| 11   | GPT-5.2 | 0.25 | 50 | Yes | 2026-03-02 | — |
+| 12   | Kimi-K2 | 0.23 | 50 | Yes | 2026-03-02 | — |
+| 13   | Oracle Forge — Team Cohere (Gemini-2.0-Flash) | 0.128 | 5 | Yes | 2026-04-21 | [#38](https://github.com/ucbepic/DataAgentBench/pull/38) |
+| 14   | Gemini-2.5-Flash | 0.09 | 50 | Yes | 2026-03-02 | — |
 
 
 ### How to Submit to the Leaderboard
 
 To contribute your agent's results to the DAB leaderboard:
 
-1. Collect results from **50 runs** on **all queries** across **all datasets**.
+1. Collect results from **5 runs** on **all queries** across **all datasets**.
 2. Organize all your run results into a *single* JSON file following this structure:
 
     ```json
@@ -48,7 +57,7 @@ To contribute your agent's results to the DAB leaderboard:
       {
         "dataset": "<dataset_name>",   // e.g., "bookreview"
         "query": "<query_id>",         // e.g., "1"
-        "run": "<run_number>",         // 0–49 for 50 runs
+        "run": "<run_number>",         // 0–4 for 5 runs
         "answer": "<agent_generated_answer>"
       },
       ...
@@ -69,7 +78,7 @@ To contribute your agent's results to the DAB leaderboard:
 
       - Any additional notes or special settings you want to highlight
 
-⚠️ You must include all 50 runs for each query in your dataset. Missing runs may result in your submission being rejected from the leaderboard.
+⚠️ You must include all 5 runs for each query in your dataset. Missing runs may result in your submission being rejected from the leaderboard.
 
 
 ## 📚 Table of Contents
@@ -97,8 +106,8 @@ To contribute your agent's results to the DAB leaderboard:
 
 This benchmark contains **12** datasets and **54** queries across **9** domains and **4** DBMSes:
 
-| Dataset          | #DBs | DBMSes                     | #Tbl | #Queries |
-| ---------------- | ---- | -------------------------- | ---- | -------- |
+| Dataset          | #DBs | DBMSes                     | #Tbls | #Queries |
+| ---------------- | ---- | -------------------------- | ----- | -------- |
 | agnews           | 2    | MongoDB, SQLite            | 3    | 4        |
 | bookreview       | 2    | PostgreSQL, SQLite         | 2    | 3        |
 | crmarenapro      | 6    | DuckDB, PostgreSQL, SQLite | 27   | 13       |
@@ -131,7 +140,7 @@ Then you can run:
 git clone https://github.com/ucbepic/DataAgentBench.git
 cd DataAgentBench
 ```
-One database file of `PATENTS` dataset, `patent_publication.db`, exceeds Git LFS file-size limits (5GB). It is on [google drive](https://drive.google.com/file/d/1pALQ1UH-OwaEUeGYAx47uCyzClfK94XC/view?usp=sharing).
+One database file of `PATENTS` dataset, `patent_publication.db`, exceeds Git LFS file-size limits (5GB). It is on [Google Drive](https://drive.google.com/file/d/1pALQ1UH-OwaEUeGYAx47uCyzClfK94XC/view?usp=sharing).
 
 **Option 1:**
 Manually download the database to `query_PATENTS/query_dataset/patent_publication.db`
@@ -166,7 +175,7 @@ This will install all required dependencies specified in [environment.yaml](./en
     Version used in our experiments: **28.4.0**
 
 - **Build the Docker image**:
-  The image includes **Python 3.12**, **Pandas**, and **PyArrow** pre-installed:
+  The image includes **Python 3.12**, **pandas**, and **PyArrow** pre-installed:
 
     ```bash
     docker build -t python-data:3.12 .
@@ -215,12 +224,12 @@ MONGO_URI=mongodb://username:password@localhost:27017/?authSource=admin
 ```
 
 **Option 2**: 
-Modifying the defaults in [db_config.py](./common_scaffold/tools/db_utils/).
+Modify the defaults in [db_config.py](./common_scaffold/tools/db_utils/).
 
 
 
 
-### Add API credentials
+### Add API Credentials
 Create a `.env` file in the project root and add your API keys:
 
 ```
@@ -255,7 +264,7 @@ and a customized prompt to adapt to the format of your model's tool call ID in [
 
 ### Run the Built-in Agent on a Single Query
 
-DAB comes with a built-in agent. You can run the agent on a specific query as follow:
+DAB comes with a built-in agent. You can run the agent on a specific query as follows:
 
 **Example:** Run a single trial of GPT-5-mini on `query1` of the `bookreview` dataset, with up to 100 agent iterations and dataset hints enabled:
 
@@ -291,9 +300,9 @@ run_0/
 ### Validate Agent Answer
 
 
-DAB provides utilities to compute both **aggregated Pass@1 accuracy of a dataset** and  **single-run correctness**.
+DAB provides utilities to compute both **aggregated Pass@1 accuracy of a dataset** and **single-run correctness**.
 
-####  Compute Pass@1 (50 Runs)
+#### Compute Pass@1 (50 Runs)
 
 We provide a script [`avg_accuracy.py`](./python_script/) to compute **Pass@1 accuracy** across **50 runs per query** of a dataset.
 
@@ -442,11 +451,11 @@ DAB allows you to **implement and run your own agents** while leveraging built-i
 If you use DAB in your research, please cite our paper:
 
 ```bibtex
-@article{ma2025dab,
-  title={DAB: Data Agent Benchmark},
-  author={Ma, Ruiying and Shankar, Shreya and Chen, Ruiqi and Lin, Yiming and Zeighami, Sepanta and Ghosh, Rajoshi and Gupta, Abhinav and Gupta, Anushrut and Gopal, Tanmai and Parameswaran, Aditya G.},
+@article{ma2026can,
+  title={Can AI Agents Answer Your Data Questions? A Benchmark for Data Agents},
+  author={Ma, Ruiying and Shankar, Shreya and Chen, Ruiqi and Lin, Yiming and Zeighami, Sepanta and Ghosh, Rajoshi and Gupta, Abhinav and Gupta, Anushrut and Gopal, Tanmai and Parameswaran, Aditya G},
   journal={arXiv preprint arXiv:2603.20576},
-  year={2025}
+  year={2026}
 }
 ```
 

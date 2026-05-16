@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-21",
+  "updatedAt": "2026-05-15",
   "sources": [
     "README leaderboard table",
     "PromptQL stratified table shared by maintainers",
@@ -8,6 +8,26 @@
   "overallLeaderboard": [
     {
       "rank": 1,
+      "agent": "Altimate Code + Claude Sonnet 4.6",
+      "trials": 5,
+      "passAt1": 0.604,
+      "team": "Altimate Code",
+      "teamUrl": "https://github.com/ucbepic/DataAgentBench/pull/44",
+      "prUrl": "https://github.com/ucbepic/DataAgentBench/pull/44",
+      "date": "2026-05-10"
+    },
+    {
+      "rank": 2,
+      "agent": "Spacedock (Recce) + Claude Opus 4.6",
+      "trials": 5,
+      "passAt1": 0.5773,
+      "team": "Spacedock (Recce)",
+      "teamUrl": "https://github.com/ucbepic/DataAgentBench/pull/47",
+      "prUrl": "https://github.com/ucbepic/DataAgentBench/pull/47",
+      "date": "2026-05-08"
+    },
+    {
+      "rank": 3,
       "agent": "Pi Coding Agent + Claude Opus 4.6",
       "trials": 5,
       "passAt1": 0.5603,
@@ -17,7 +37,7 @@
       "date": "2026-04-21"
     },
     {
-      "rank": 2,
+      "rank": 4,
       "agent": "PromptQL + Gemini 3.1 Pro",
       "trials": 5,
       "passAt1": 0.543,
@@ -27,7 +47,7 @@
       "date": "2026-03-18"
     },
     {
-      "rank": 3,
+      "rank": 5,
       "agent": "PromptQL + Claude Opus 4.6",
       "trials": 5,
       "passAt1": 0.508,
@@ -37,7 +57,17 @@
       "date": "2026-03-02"
     },
     {
-      "rank": 4,
+      "rank": 6,
+      "agent": "Oracle Forge (Team PaLM) + Gemini 3.1 Pro Preview",
+      "trials": 5,
+      "passAt1": 0.4601,
+      "team": "Team PaLM",
+      "teamUrl": "https://github.com/ucbepic/DataAgentBench/pull/37",
+      "prUrl": "https://github.com/ucbepic/DataAgentBench/pull/37",
+      "date": "2026-04-19"
+    },
+    {
+      "rank": 7,
       "agent": "Oracle Forge (Tenacious Intelligence) + Claude Sonnet 4.6",
       "trials": 5,
       "passAt1": 0.4554,
@@ -47,7 +77,7 @@
       "date": "2026-04-21"
     },
     {
-      "rank": 5,
+      "rank": 8,
       "agent": "Claude Opus 4.6 ReAct",
       "trials": 5,
       "passAt1": 0.4376,
@@ -57,7 +87,7 @@
       "date": "2026-03-18"
     },
     {
-      "rank": 6,
+      "rank": 9,
       "agent": "Gemini-3-Pro ReAct",
       "trials": 50,
       "passAt1": 0.38,
@@ -66,7 +96,7 @@
       "date": "2026-03-02"
     },
     {
-      "rank": 7,
+      "rank": 10,
       "agent": "GPT-5-mini ReAct",
       "trials": 50,
       "passAt1": 0.3,
@@ -75,7 +105,7 @@
       "date": "2026-03-02"
     },
     {
-      "rank": 8,
+      "rank": 11,
       "agent": "GPT-5.2 ReAct",
       "trials": 50,
       "passAt1": 0.25,
@@ -84,7 +114,7 @@
       "date": "2026-03-02"
     },
     {
-      "rank": 9,
+      "rank": 12,
       "agent": "Kimi-K2 ReAct",
       "trials": 50,
       "passAt1": 0.23,
@@ -93,7 +123,7 @@
       "date": "2026-03-02"
     },
     {
-      "rank": 10,
+      "rank": 13,
       "agent": "Oracle Forge (Team Cohere) + Gemini 2.0 Flash",
       "trials": 5,
       "passAt1": 0.128,
@@ -103,7 +133,7 @@
       "date": "2026-04-21"
     },
     {
-      "rank": 11,
+      "rank": 14,
       "agent": "Gemini-2.5-Flash ReAct",
       "trials": 50,
       "passAt1": 0.09,

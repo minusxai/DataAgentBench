@@ -3,6 +3,10 @@
 .DS_Store
 # general py
 __pycache__/
+.history/
+
+# runtime
+claude_projects/
 
 # results
 results/
@@ -35,6 +39,18 @@ common_scaffold/tools/backup/
 common_scaffold/*_backup/
 
 # datasets
+query_imdb/query_dataset/imdb*
+query_imdb/data_raw/
+query_imdb/job_queries/
+query_imdb/job_results/
+query_imdb/query*/query.sql
+query_imdb/scripts/
+query_krama/query_dataset/domain_docs/domain_docs_db/files.bson.bak
+query_krama/query_dataset/domain_assets.db.bak
+query_krama/query_dataset/misc_files/
+query_krama/query_dataset/geo.db
+query_krama/query*/ground_truth.py
+query_krama/scripts/
 query_civic_unstructured/
 query_paper_unstructured/
 query_notice_unstructured/
