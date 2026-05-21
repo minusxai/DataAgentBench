@@ -1,0 +1,1 @@
+"How many distinct CVEs are listed in CISA's KEV catalog AND have at least one vulnerable Microsoft product configuration AND have a CVSS v3 base score of 7.0 or higher? Use the exact numeric score encoded as the first numeric token in vulns_db.cvss_metadata.score_text."

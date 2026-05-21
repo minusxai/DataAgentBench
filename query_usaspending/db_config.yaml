@@ -1,0 +1,15 @@
+db_clients:
+  contracts_db:
+    db_type: postgres
+    db_name: usaspending_contracts
+    sql_file: query_dataset/contracts.sql
+  recipients_db:
+    db_type: sqlite
+    db_path: query_dataset/recipients.db
+  agencies_db:
+    db_type: duckdb
+    db_path: query_dataset/agencies.duckdb
+  descriptions_db:
+    db_type: mongo
+    db_name: usaspending_descriptions
+    dump_folder: query_dataset/descriptions

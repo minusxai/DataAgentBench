@@ -1,0 +1,2 @@
+HINTS:
+- Many identifier columns in both databases use non-standard string encodings rather than plain integers. To join across tables, you must extract the embedded numeric ID by stripping the alphabetic prefix, any punctuation padding characters, and any leading zeros. For example, `tt0000042` → `42`, `nm001` → `1`, `InfT~~7` → `7`. This applies to the following columns: title.id, company_name.id, movie_companies.id, name.id, cast_info.person_id, keyword.id, movie_keyword.keyword_id, info_type.id, movie_info.info_type_id, and role_type.id.

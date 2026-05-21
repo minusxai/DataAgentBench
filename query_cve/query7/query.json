@@ -1,0 +1,1 @@
+"Among CPE match entries flagged as vulnerable AND whose CVE is listed in CISA's Known Exploited Vulnerabilities (KEV) catalog, which canonical (vendor, product) pair has the highest count of rows? Return as a single string in the form 'vendor:product' (both lowercase)."

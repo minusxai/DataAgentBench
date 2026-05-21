@@ -1,0 +1,1 @@
+"How many distinct CVEs satisfy ALL of the following: they appear in MORE THAN ONE row of the cves table in vulns_db with conflicting cvss3_attack_vector values, AND they are listed in CISA's Known Exploited Vulnerabilities (KEV) catalog?"

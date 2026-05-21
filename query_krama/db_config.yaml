@@ -1,0 +1,13 @@
+db_clients:
+  domain_docs:
+    db_type: mongo                            # Database type: MongoDB
+    db_name: domain_docs_db                   # Name of the MongoDB database
+    dump_folder: query_dataset/domain_docs    # Folder with the MongoDB dump to initialize
+
+  geo_database:
+    db_type: sqlite                           # Database type: SQLite
+    db_path: query_dataset/us_geo.db          # Path to the SQLite file
+
+  domain_assets:
+    db_type: sqlite                           # Database type: SQLite
+    db_path: query_dataset/domain_assets.db   # Path to the SQLite file

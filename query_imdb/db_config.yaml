@@ -1,0 +1,8 @@
+db_clients:
+  movies_database:
+    db_type: postgres
+    db_name: movies_db
+    sql_file: query_dataset/movies.sql
+  people_database:
+    db_type: sqlite
+    db_path: query_dataset/people.sqlite

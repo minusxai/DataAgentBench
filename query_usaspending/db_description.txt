@@ -1,0 +1,70 @@
+You are working with four databases to solve this query.
+
+Here are the descriptions of these four databases:
+
+1. contracts_db
+   - This database is stored in a PostgreSQL database. It contains the federal contract awards registry sourced from USAspending.gov, plus a sibling table holding award amounts.
+   - This database consists of two tables:
+     - contracts
+       - One row per contract award.
+       - Fields:
+         - award_id (str): Award identifier (surface form varies per table; same canonical id may appear differently in contract_amounts and descriptions_db)
+         - generated_internal_id (str): Internal USAspending identifier
+         - recipient_uei (str): Unique Entity Identifier of the recipient
+         - awarding_agency (str): Awarding agency
+         - awarding_sub_agency (str): Awarding sub-agency
+         - funding_agency (str): Funding agency
+         - start_date (str): ISO date string
+         - end_date (str): ISO date string
+         - naics_code (str): NAICS code
+         - psc_code (str): Product / Service Code
+         - award_type (str): Contract type code
+     - contract_amounts
+       - Award amount per contract, encoded as text.
+       - Fields:
+         - award_id (str): Award identifier (surface form varies; join to contracts requires normalization)
+         - amount_text (str): Dollar amount encoded in one of many text formats (e.g. plain integer, "$1,500,000.00", "1.5M", "one million five hundred thousand dollars", "$1,050,000 + $450,000")
+
+2. recipients_db
+   - This database is stored in a SQLite database. It contains the per-recipient registry derived from contract awards.
+   - This database consists of one table:
+     - recipients
+       - One row per recipient.
+       - Fields:
+         - uei (str): Unique Entity Identifier
+         - name (str): Recipient name
+         - state (str): U.S. state of the recipient
+         - n_contracts (int): Number of contract awards this recipient holds
+         - total_amount_text (str): Sum of contract amounts
+
+3. agencies_db
+   - This database is stored in a DuckDB database. It contains the awarding-agency reference, an agency-alias lookup, and the NAICS sector hierarchy.
+   - This database consists of three tables:
+     - agencies
+       - One row per canonical agency.
+       - Fields:
+         - name (str): Canonical agency name
+         - n_contracts (int): Total number of contracts awarded
+         - total_amount_text (str): Total awarded amount
+     - agency_aliases
+       - Agency surface-form lookup.
+       - Fields:
+         - surface_form (str): Surface form
+         - canonical_name (str): Canonical agency name
+     - naics_sectors
+       - NAICS code hierarchy.
+       - Fields:
+         - code (str): NAICS code
+         - description (str): Human-readable description
+         - sector (str): 2-digit parent sector code
+
+4. descriptions_db
+   - This database is stored in a MongoDB database. It contains free-text contract descriptions.
+   - This database consists of one collection:
+     - contract_documents
+       - One document per award.
+       - Fields:
+         - award_id (str): Award identifier
+         - descriptions (list of dict): Free-text descriptions, each with:
+           - language (str): ISO language code (e.g. "en", "es")
+           - value (str): Description prose

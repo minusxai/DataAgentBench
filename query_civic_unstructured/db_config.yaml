@@ -1,0 +1,9 @@
+db_clients:
+  civic_docs_database:
+    db_type: mongo
+    db_name: civic_db
+    dump_folder: query_dataset/civic_docs_dump
+
+  funding_database:
+    db_type: sqlite
+    db_path: query_dataset/funding.db

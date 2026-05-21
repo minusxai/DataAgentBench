@@ -6,9 +6,27 @@ from pathlib import Path
 from autogen_core import CancellationToken
 from autogen_core.code_executor import CodeBlock
 from autogen_ext.code_executors.docker import DockerCommandLineCodeExecutor
+import docker
 import logging
 import os
 import json
+
+
+class _NetworkIsolatedDockerExecutor(DockerCommandLineCodeExecutor):
+    """Drops all network access from the exec container after it starts."""
+
+    async def start(self) -> None:
+        await super().start()
+        _log = logging.getLogger(__name__)
+        try:
+            client = docker.from_env()
+            container = client.containers.get(self.container_name)
+            networks = list(container.attrs["NetworkSettings"]["Networks"].keys())
+            for net in networks:
+                client.networks.get(net).disconnect(container)
+            _log.info(f"Exec container network-isolated (disconnected from: {networks})")
+        except Exception as e:
+            _log.warning(f"Could not isolate exec container network: {e}")
 
 
 class ExecTool(BaseTool):
@@ -77,7 +95,7 @@ class ExecTool(BaseTool):
     def _start_executor(self):
         """Start a fresh docker executor."""
         self.logger.debug("Starting Docker executor...")
-        self._executor = DockerCommandLineCodeExecutor(
+        self._executor = _NetworkIsolatedDockerExecutor(
             image="python-data:3.12",
             work_dir=self.work_dir,
         )

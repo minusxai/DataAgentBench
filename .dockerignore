@@ -1,0 +1,28 @@
+# Never bake the dataset answer keys or construction recipes into a runtime
+# container image — agents running inside the container must not be able to
+# read the corruption pipeline or the canonical pre-corruption snapshot.
+
+# Canonical un-corrupted snapshots and corruption manifests (= answer keys)
+query_*/clean/
+
+# Per-dataset construction code (corruption recipes, ground-truth SQL,
+# verifier prompts). The agent-visible DBs in query_*/query_dataset/ are
+# already corrupted; the manual_querycode/ dir holds the recipes that
+# produced them.
+query_*/manual_querycode/
+
+# Local results / traces / scratch
+sdk_runner/results/
+sdk_runner/results_backups/
+.venv/
+.codex/
+.claude/
+.env
+__pycache__/
+*.pyc
+
+# VCS / editor noise
+.git/
+.gitignore
+.gitattributes
+.DS_Store

@@ -1,0 +1,15 @@
+db_clients:
+  vulns_db:
+    db_type: sqlite
+    db_path: query_dataset/vulns.db
+  cpe_db:
+    db_type: duckdb
+    db_path: query_dataset/cpe.duckdb
+  kev_db:
+    db_type: postgres
+    db_name: cve_kev
+    sql_file: query_dataset/kev.sql
+  descriptions_db:
+    db_type: mongo
+    db_name: cve_descriptions
+    dump_folder: query_dataset/descriptions

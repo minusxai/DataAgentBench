@@ -1,0 +1,10 @@
+HINTS:
+- Bacterial exceedance rate: (violations / total samples) × 100.
+- Beach join key: community_code, county_code, and beach_name appear in varying formats across sources and may need to be canonicalized before joining.
+- MSA name matching: use the city-and-state portion only; treat em dashes, double hyphens, and hyphens as equivalent.
+- Date and time formats vary across sources and may need to be canonicalized before comparison.
+- Patient ID formats differ across sources and may need to be canonicalized before joining.
+- BSTAR compact notation: ±NNNNN±E = ±0.NNNNN × 10^E (e.g., 20621-3 = 2.0621 × 10⁻⁴).
+- Temperature unit conversion: °F = °C × 9/5 + 32; K = °C + 273.15.
+- Key values — including locations, timestamps, identifiers, statistics, and flags — may be embedded in natural-language prose and may need to be extracted before use.
+- To answer a query, you may need multiple documents from domain_docs; a document's domain can be inferred from its name and content.
