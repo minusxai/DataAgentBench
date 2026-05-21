@@ -29,7 +29,7 @@ Unlike prior SQL-only or single-database benchmarks, DAB stresses agents under *
 
 | Rank | Model | Pass@1 | Trials/Query | Hints? | Date | Submission |
 | ---- | ----- | ------ | ------------ | ---------- | ---- | ---------- |
-| 1    | MiniX (Claude Sonnet 4.6 + GPT5.5-mini + Claude Haiku 4.5) | 0.6310 | 5 | Yes | 2026-05-21 | [#50](https://github.com/ucbepic/DataAgentBench/pull/50) |
+| 1    | MinusX (Claude Sonnet 4.6 + GPT5.5-mini + Claude Haiku 4.5) | 0.6310 | 5 | Yes | 2026-05-21 | [#50](https://github.com/ucbepic/DataAgentBench/pull/50) |
 | 2    | Altimate Code (Claude-Sonnet-4.6) | 0.6040 | 5 | Yes | 2026-05-10 | [#44](https://github.com/ucbepic/DataAgentBench/pull/44) |
 | 3    | Spacedock (Recce) (Claude-Opus-4.6) | 0.5773 | 5 | No | 2026-05-08 | [#47](https://github.com/ucbepic/DataAgentBench/pull/47) |
 | 4    | Pi Coding Agent (Claude-Opus-4.6) | 0.5603 | 5 | Yes | 2026-04-21 | [#31](https://github.com/ucbepic/DataAgentBench/pull/31) |
