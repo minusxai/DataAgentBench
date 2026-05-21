@@ -8,10 +8,10 @@
   "overallLeaderboard": [
     {
       "rank": 1,
-      "agent": "MiniX + Claude Sonnet 4.6 + GPT5.5-mini + Claude Haiku 4.5",
+      "agent": "MinusX + Claude Sonnet 4.6 + GPT5.5-mini + Claude Haiku 4.5",
       "trials": 5,
       "passAt1": 0.631,
-      "team": "MiniX",
+      "team": "MinusX",
       "teamUrl": "https://github.com/ucbepic/DataAgentBench/pull/50",
       "prUrl": "https://github.com/ucbepic/DataAgentBench/pull/50",
       "date": "2026-05-21"
